@@ -339,7 +339,68 @@ void *doBestFit(size_t size)
 }
 void *doWorstFit(size_t size)
 {
-	return NULL;
+		if (headOfFree == NULL)
+	{
+		allocateMoreMemory(32768 + sizeof(header));
+	}
+	header *currentNode = headOfFree;
+	size_t sizePostHeader = size + sizeof(header);
+	sizePostHeader = alignSize(sizePostHeader);
+	header *largestSectionSoFar = NULL;
+
+	while (1)
+	{
+		if (currentNode->size >= sizePostHeader)
+		{
+			if (largestSectionSoFar == NULL || currentNode->size > largestSectionSoFar->size)
+				largestSectionSoFar = currentNode;
+		}
+		if (currentNode->nextBlock == NULL)
+		{
+			if (largestSectionSoFar == NULL)
+			{
+				allocateMoreMemory(sizePostHeader);
+				currentNode = headOfFree;
+			}
+			else
+			{
+				break;
+			}
+		}
+		else
+		{
+			currentNode = currentNode->nextBlock;
+		}
+	}
+	currentNode = largestSectionSoFar;
+	size_t sizeOfSegmentAfterAlloc = currentNode->size - sizePostHeader;
+
+	// if we split this, the next chunk is literally too small for us to use, so let's just give the whole block of memory to this block so we don't lose it
+	if (sizeOfSegmentAfterAlloc < alignSize(sizeof(header) + 1))
+	{
+		currentNode->isFree = 0;
+		// cut out from the free list
+		if (currentNode == headOfFree)
+		{
+			// TODO: figure out what happens if we're out of stuff -- prob need to do update to the get more memory function
+			headOfFree = currentNode->nextBlock; // TODO: what happens if this is null?
+		}
+		else
+		{
+			currentNode->prevBlock->nextBlock = currentNode->nextBlock;
+		}
+		if (currentNode->nextBlock != NULL)
+		{
+			currentNode->nextBlock->prevBlock = currentNode->prevBlock;
+		}
+		orderNewlyAllocatedNode(currentNode);
+	}
+	else
+	{
+		// standard case -- split up the current block
+		splitCurrentBlock(currentNode, sizePostHeader, sizeOfSegmentAfterAlloc);
+	}
+	return (void *)(currentNode + 1);
 }
 
 int getSysReqMem()
