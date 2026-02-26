@@ -1,0 +1,13 @@
+Clarifications:
+TDMM:
+
+None at the moment
+
+Report:
+
+Memory Utilization:
+
+You can choose to write any test program to measure this metric (the amount to malloc, number of times to malloc, the total allocation size, etc.). Be sure to justify your approach.
+
+The "time" is in terms of allocation and deallocation events
+
