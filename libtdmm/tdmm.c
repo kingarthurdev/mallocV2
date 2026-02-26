@@ -162,7 +162,7 @@ void t_free(void *ptr)
 		}
 	}
 
-	coalesceFreeSections();
+	//coalesceFreeSections();
 }
 
 void allocateMoreMemory(size_t amountOfMemNeeded)
