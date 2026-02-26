@@ -2,16 +2,18 @@
 #include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 header *headOfFree;
 header *headOfOccupied;
 alloc_strat_e currentMode;
 int currentAmountAllocated;
-int alignmentSize = 4;
+int alignmentSize;
 
 // TODO: do some integrity checks with the 0xDEADBEEF value to actually use it.
 void t_init(alloc_strat_e strat)
 {
+	alignmentSize = sysconf(_SC_PAGESIZE);//because mmap already has its own internal alignment -- so if we don't do this, we're just wasting memory
 	currentAmountAllocated = 32768 + sizeof(header);
 	// set how we're gonna do this
 	currentMode = strat;
@@ -279,38 +281,30 @@ void *doBestFit(size_t size)
 	header *currentNode = headOfFree;
 	size_t sizePostHeader = size + sizeof(header);
 	sizePostHeader = alignSize(sizePostHeader);
-	int needUpdateFirstNode = 0;
 	header *smallestSectionSoFar = NULL;
 
 	while (1)
 	{
 		if (currentNode->size >= sizePostHeader)
 		{
+			if (smallestSectionSoFar == NULL || currentNode->size < smallestSectionSoFar->size)
+				smallestSectionSoFar = currentNode;
+		}
+		if (currentNode->nextBlock == NULL)
+		{
 			if (smallestSectionSoFar == NULL)
 			{
-				smallestSectionSoFar = currentNode;
+				allocateMoreMemory(sizePostHeader);
+				currentNode = headOfFree;
 			}
-			else if (currentNode->size < smallestSectionSoFar->size)
+			else
 			{
-				smallestSectionSoFar = currentNode;
+				break;
 			}
 		}
 		else
 		{
-			if (currentNode->nextBlock == NULL && smallestSectionSoFar == NULL)
-			{
-				// did not find a suitable block, need to allocate more memory
-				allocateMoreMemory(sizePostHeader);
-				currentNode = headOfFree;
-			}
-			else if (currentNode->nextBlock == NULL)
-			{
-				break;
-			}
-			else
-			{
-				currentNode = currentNode->nextBlock;
-			}
+			currentNode = currentNode->nextBlock;
 		}
 	}
 	currentNode = smallestSectionSoFar;
