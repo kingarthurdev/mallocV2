@@ -3,6 +3,27 @@
 
 #include <stddef.h>
 
+typedef struct header
+{
+	size_t size;
+	int isFree; // 0 for no, 1 for yes
+	struct header *nextBlock;
+	struct header *prevBlock;
+	int protectionBlock;
+} header;
+
+void throwError(char *message);
+void* doFirstFit(size_t size);
+void* doBestFit(size_t size);
+void* doWorstFit(size_t size);
+void allocateMoreMemory();
+size_t alignSize(size_t sizeOfDataPlusHeader);
+void orderNewlyAllocatedNode(header *targetNode);
+void orderNewFreeData(header *address);
+int getSysReqMem();
+void coalesceFreeSections();
+void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOfSegmentAfterAlloc);
+
 typedef enum {
   FIRST_FIT,
   BEST_FIT,
