@@ -137,7 +137,6 @@ void t_free(void *ptr)
 				}
 				currentNode->isFree = 1;
 				orderNewFreeData(currentNode);
-				coalesceFreeSectionsV2(currentNode);
 			}
 			else
 			{
@@ -150,7 +149,6 @@ void t_free(void *ptr)
 				currentNode->nextBlock = NULL;
 				currentNode->isFree = 1;
 				orderNewFreeData(currentNode);
-				coalesceFreeSectionsV2(currentNode);
 			}
 			break;
 		}
@@ -163,8 +161,7 @@ void t_free(void *ptr)
 			currentNode = currentNode->nextBlock;
 		}
 	}
-
-	// coalesceFreeSections();
+	coalesceFreeSectionsV2(currentNode);
 }
 
 void allocateMoreMemory(size_t amountOfMemNeeded)
