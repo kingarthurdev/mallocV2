@@ -571,6 +571,5 @@ void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOf
 
 double memoryUtilizationPercentage()
 {
-	printf("%llu      %llu\n", currentBytesRequested, currentAmountAllocated);
 	return ((double)currentBytesRequested / (double)currentAmountAllocated) * 100.0;
 }

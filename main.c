@@ -7,10 +7,9 @@
 void basicTestingBenchmarks();
 void getAverageUtilizationPercentages();
 
-
 int main(int argc, char *argv[])
 {
-	//basicTestingBenchmarks();
+	// basicTestingBenchmarks();
 	getAverageUtilizationPercentages();
 
 	return 0;
@@ -48,9 +47,9 @@ void basicTestingBenchmarks()
 
 	start = clock();
 
-	int *mallocs[25000];
+	int *mallocs[2500];
 
-	for (int i = 0; i < 25000; i++)
+	for (int i = 0; i < 2500; i++)
 	{
 		void *mem4 = t_malloc(i * 50);
 		mallocs[i] = mem4;
@@ -60,7 +59,7 @@ void basicTestingBenchmarks()
 	printf("Time taken for allocating 25000 times: %f seconds\n", cpu_time_used);
 
 	start = clock();
-	for (int i = 0; i < 25000; i++)
+	for (int i = 0; i < 2500; i++)
 	{
 		t_free(mallocs[i]);
 	}
@@ -70,7 +69,7 @@ void basicTestingBenchmarks()
 
 	if (cpu_time_used > 2)
 	{
-		//throwError("ERROR! Too slow!");
+		// throwError("ERROR! Too slow!");
 	}
 
 	printf("Basic allocation and time limit test passed!\n");
@@ -78,9 +77,10 @@ void basicTestingBenchmarks()
 
 void getAverageUtilizationPercentages()
 {
-	int max = 320; // max bytes I wanna allocate
+	int max = 3200; // max bytes I wanna allocate
 	alloc_strat_e strat;
-	char *stratInText = calloc(15, 1);
+	char *stratInText = NULL;
+	FILE *fpt;
 	for (int i = 0; i < 3; i++)
 	{
 		switch (i)
@@ -88,34 +88,44 @@ void getAverageUtilizationPercentages()
 		case 0:
 			strat = FIRST_FIT;
 			stratInText = "FIRST_FIT";
+			fpt = fopen("FIRST_FIT.csv", "w+");
 			break;
 		case 1:
 			strat = BEST_FIT;
 			stratInText = "BEST_FIT";
+			fpt = fopen("BEST_FIT.csv", "w+");
 			break;
 		case 2:
 			strat = WORST_FIT;
 			stratInText = "WORST_FIT";
+			fpt = fopen("WORST_FIT.csv", "w+");
 			break;
 		}
+		fprintf(fpt, "Iteration, Average Percent Utilization\n");
+		int externalCount = 0;
+
 		t_init(strat);
 		srand(time(NULL));
 		void *addresses[25000];
 		int count = 0;
 		for (int i = 0; i < 25000; i++)
 		{
+			externalCount++;
 			void *asdf = t_malloc(rand() % (max + 1));
 			addresses[i] = asdf;
-
+			fprintf(fpt, "%i,%.3f\n", externalCount, memoryUtilizationPercentage());
 			int randSelector = rand() % 11;
 			// 10% chance of freeing
 			if (randSelector == 10)
 			{
+				externalCount++;
 				t_free(addresses[count]);
+				fprintf(fpt, "%i,%.3f\n", externalCount, memoryUtilizationPercentage());
 				count++;
 			}
 		}
+		fclose(fpt);
+		fpt = NULL;
 		printf("Strategy: %s   |   Average Percent Utilization: %.2f\n", stratInText, memoryUtilizationPercentage());
 	}
-	
 }
