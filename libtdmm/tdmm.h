@@ -23,6 +23,7 @@ void orderNewFreeData(header *address);
 int getSysReqMem();
 void coalesceFreeSections();
 void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOfSegmentAfterAlloc);
+void coalesceFreeSectionsV2(header *currentNode);
 
 typedef enum {
   FIRST_FIT,

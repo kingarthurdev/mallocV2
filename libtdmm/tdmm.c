@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 
 header *headOfFree;
 header *headOfOccupied;
@@ -119,6 +120,7 @@ void t_free(void *ptr)
 	{
 		throwError("ERROR! No allocations present, so nothing to free");
 	}
+	/*
 	while (1)
 	{
 		if ((currentNode + 1) == ptr)
@@ -160,7 +162,45 @@ void t_free(void *ptr)
 		{
 			currentNode = currentNode->nextBlock;
 		}
+	}*/
+
+	// jankify way hehe:
+	if (((header *)(ptr)-1)->protectionBlock == 0xDEADBEEF)
+	{
+		// we'll pretend this is good enough to validate that we found a legit pointer...
+		//  we found it, now do the freeing stuff
+		if (currentNode == headOfOccupied)
+		{
+			if (currentNode->nextBlock == NULL)
+			{
+				headOfOccupied = NULL;
+			}
+			else
+			{
+				headOfOccupied = currentNode->nextBlock;
+				headOfOccupied->prevBlock = NULL;
+			}
+			currentNode->isFree = 1;
+			orderNewFreeData(currentNode);
+		}
+		else
+		{
+			// currentNode presumably has a previous and next block, so cut it free
+			if (currentNode->prevBlock != NULL)
+				currentNode->prevBlock->nextBlock = currentNode->nextBlock;
+			if (currentNode->nextBlock != NULL)
+				currentNode->nextBlock->prevBlock = currentNode->prevBlock;
+			currentNode->prevBlock = NULL;
+			currentNode->nextBlock = NULL;
+			currentNode->isFree = 1;
+			orderNewFreeData(currentNode);
+		}
 	}
+	else
+	{
+		throwError("ERROR! Cannot find address you're trying to free");
+	}
+
 	coalesceFreeSectionsV2(currentNode);
 }
 
@@ -181,6 +221,24 @@ void allocateMoreMemory(size_t amountOfMemNeeded)
 
 void orderNewFreeData(header *address)
 {
+	// temp just to try something:
+	if (headOfFree == NULL)
+	{
+		headOfFree = address;
+		headOfFree->prevBlock = NULL;
+		headOfFree->nextBlock = NULL;
+		return;
+	}
+	else
+	{
+		// put address before the headOfFree in the linked list
+		address->nextBlock = headOfFree;
+		address->prevBlock = NULL;
+		headOfFree->prevBlock = address;
+		headOfFree = address;
+	}
+
+	/*
 	if (headOfFree == NULL)
 	{
 		headOfFree = address;
@@ -221,7 +279,7 @@ void orderNewFreeData(header *address)
 				currentNode = currentNode->nextBlock;
 			}
 		}
-	}
+	}*/
 }
 
 void throwError(char *message)
@@ -240,7 +298,16 @@ void orderNewlyAllocatedNode(header *targetNode)
 		targetNode->prevBlock = NULL;
 		return;
 	}
-	while (1)
+	else
+	{
+		targetNode->nextBlock = headOfOccupied;
+		targetNode->prevBlock = NULL;
+		headOfOccupied->prevBlock = targetNode;
+		headOfOccupied = targetNode;
+	}
+
+	// what if I just don't...
+	/*while (1)
 	{
 		// Case: we've reached the end of the allocated list
 		if (currentNode->nextBlock == NULL)
@@ -264,7 +331,7 @@ void orderNewlyAllocatedNode(header *targetNode)
 			// Case: we're not at the right place and there's still places to go
 			currentNode = currentNode->nextBlock;
 		}
-	}
+	}*/
 }
 
 size_t alignSize(size_t sizeOfDataPlusHeader)
