@@ -13,7 +13,7 @@ int alignmentSize;
 // TODO: do some integrity checks with the 0xDEADBEEF value to actually use it.
 void t_init(alloc_strat_e strat)
 {
-	alignmentSize = sysconf(_SC_PAGESIZE);//because mmap already has its own internal alignment -- so if we don't do this, we're just wasting memory
+	alignmentSize = sysconf(_SC_PAGESIZE); // because mmap already has its own internal alignment -- so if we don't do this, we're just wasting memory
 	currentAmountAllocated = 32768 + sizeof(header);
 	// set how we're gonna do this
 	currentMode = strat;
@@ -137,6 +137,7 @@ void t_free(void *ptr)
 				}
 				currentNode->isFree = 1;
 				orderNewFreeData(currentNode);
+				coalesceFreeSectionsV2(currentNode);
 			}
 			else
 			{
@@ -149,6 +150,7 @@ void t_free(void *ptr)
 				currentNode->nextBlock = NULL;
 				currentNode->isFree = 1;
 				orderNewFreeData(currentNode);
+				coalesceFreeSectionsV2(currentNode);
 			}
 			break;
 		}
@@ -162,7 +164,7 @@ void t_free(void *ptr)
 		}
 	}
 
-	//coalesceFreeSections();
+	// coalesceFreeSections();
 }
 
 void allocateMoreMemory(size_t amountOfMemNeeded)
@@ -339,7 +341,7 @@ void *doBestFit(size_t size)
 }
 void *doWorstFit(size_t size)
 {
-		if (headOfFree == NULL)
+	if (headOfFree == NULL)
 	{
 		allocateMoreMemory(32768 + sizeof(header));
 	}
@@ -417,7 +419,7 @@ void coalesceFreeSections()
 	}
 	while (currentNode != NULL && currentNode->nextBlock != NULL)
 	{
-		if ((char *)currentNode + currentNode->size == (char *)currentNode->nextBlock)
+		if ((char *)currentNode + currentNode->size == currentNode->nextBlock)
 		{
 			currentNode->size = currentNode->size + currentNode->nextBlock->size;
 			currentNode->nextBlock = currentNode->nextBlock->nextBlock;
@@ -427,6 +429,31 @@ void coalesceFreeSections()
 		else
 		{
 			currentNode = currentNode->nextBlock;
+		}
+	}
+}
+
+void coalesceFreeSectionsV2(header *currentNode)
+{
+	if (currentNode->nextBlock != NULL)
+	{
+		if ((char *)(currentNode) + currentNode->size == currentNode->nextBlock)
+		{
+			currentNode->size = currentNode->size + currentNode->nextBlock->size;
+			currentNode->nextBlock = currentNode->nextBlock->nextBlock;
+			if (currentNode->nextBlock != NULL)
+				currentNode->nextBlock->prevBlock = currentNode;
+		}
+	}
+	if (currentNode->prevBlock != NULL)
+	{
+		if ((char *)(currentNode)-currentNode->prevBlock->size == currentNode->prevBlock)
+		{
+			currentNode = currentNode->prevBlock; // go back one so I can be lazy and just recycle the same logic as above
+			currentNode->size = currentNode->size + currentNode->nextBlock->size;
+			currentNode->nextBlock = currentNode->nextBlock->nextBlock;
+			if (currentNode->nextBlock != NULL)
+				currentNode->nextBlock->prevBlock = currentNode;
 		}
 	}
 }
