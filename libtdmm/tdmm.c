@@ -10,6 +10,8 @@ header *headOfOccupied;
 alloc_strat_e currentMode;
 int currentAmountAllocated;
 int alignmentSize;
+int timesCalled1 = 0;
+int timesCalled2 = 0;
 
 // TODO: do some integrity checks with the 0xDEADBEEF value to actually use it.
 void t_init(alloc_strat_e strat)
@@ -115,10 +117,47 @@ void *doFirstFit(size_t size)
 
 void t_free(void *ptr)
 {
-	header *currentNode = headOfOccupied;
-	if (currentNode == NULL)
+	if (headOfOccupied == NULL)
 	{
 		throwError("ERROR! No allocations present, so nothing to free");
+	}
+
+	header *currentNodeStart = (header *)(ptr)-1;
+	// jankify way hehe:
+	if (currentNodeStart->protectionBlock == 0xDEADBEEF)
+	{
+		// we'll pretend this is good enough to validate that we found a legit pointer...
+		//  we found it, now do the freeing stuff
+		if (currentNodeStart == headOfOccupied)
+		{
+			if (currentNodeStart->nextBlock == NULL)
+			{
+				headOfOccupied = NULL;
+			}
+			else
+			{
+				headOfOccupied = currentNodeStart->nextBlock;
+				headOfOccupied->prevBlock = NULL;
+			}
+			currentNodeStart->isFree = 1;
+			orderNewFreeData(currentNodeStart);
+		}
+		else
+		{
+			// currentNode presumably has a previous and next block, so cut it free
+			if (currentNodeStart->prevBlock != NULL)
+				currentNodeStart->prevBlock->nextBlock = currentNodeStart->nextBlock;
+			if (currentNodeStart->nextBlock != NULL)
+				currentNodeStart->nextBlock->prevBlock = currentNodeStart->prevBlock;
+			currentNodeStart->prevBlock = NULL;
+			currentNodeStart->nextBlock = NULL;
+			currentNodeStart->isFree = 1;
+			orderNewFreeData(currentNodeStart);
+		}
+	}
+	else
+	{
+		throwError("ERROR! Cannot find address you're trying to free");
 	}
 	/*
 	while (1)
@@ -163,45 +202,7 @@ void t_free(void *ptr)
 			currentNode = currentNode->nextBlock;
 		}
 	}*/
-
-	// jankify way hehe:
-	if (((header *)(ptr)-1)->protectionBlock == 0xDEADBEEF)
-	{
-		// we'll pretend this is good enough to validate that we found a legit pointer...
-		//  we found it, now do the freeing stuff
-		if (currentNode == headOfOccupied)
-		{
-			if (currentNode->nextBlock == NULL)
-			{
-				headOfOccupied = NULL;
-			}
-			else
-			{
-				headOfOccupied = currentNode->nextBlock;
-				headOfOccupied->prevBlock = NULL;
-			}
-			currentNode->isFree = 1;
-			orderNewFreeData(currentNode);
-		}
-		else
-		{
-			// currentNode presumably has a previous and next block, so cut it free
-			if (currentNode->prevBlock != NULL)
-				currentNode->prevBlock->nextBlock = currentNode->nextBlock;
-			if (currentNode->nextBlock != NULL)
-				currentNode->nextBlock->prevBlock = currentNode->prevBlock;
-			currentNode->prevBlock = NULL;
-			currentNode->nextBlock = NULL;
-			currentNode->isFree = 1;
-			orderNewFreeData(currentNode);
-		}
-	}
-	else
-	{
-		throwError("ERROR! Cannot find address you're trying to free");
-	}
-
-	coalesceFreeSectionsV2(currentNode);
+	coalesceFreeSectionsV2(currentNodeStart);
 }
 
 void allocateMoreMemory(size_t amountOfMemNeeded)
@@ -221,24 +222,6 @@ void allocateMoreMemory(size_t amountOfMemNeeded)
 
 void orderNewFreeData(header *address)
 {
-	// temp just to try something:
-	if (headOfFree == NULL)
-	{
-		headOfFree = address;
-		headOfFree->prevBlock = NULL;
-		headOfFree->nextBlock = NULL;
-		return;
-	}
-	else
-	{
-		// put address before the headOfFree in the linked list
-		address->nextBlock = headOfFree;
-		address->prevBlock = NULL;
-		headOfFree->prevBlock = address;
-		headOfFree = address;
-	}
-
-	/*
 	if (headOfFree == NULL)
 	{
 		headOfFree = address;
@@ -279,7 +262,7 @@ void orderNewFreeData(header *address)
 				currentNode = currentNode->nextBlock;
 			}
 		}
-	}*/
+	}
 }
 
 void throwError(char *message)
@@ -290,8 +273,7 @@ void throwError(char *message)
 
 void orderNewlyAllocatedNode(header *targetNode)
 {
-	header *currentNode = headOfOccupied;
-	if (currentNode == NULL)
+	if (headOfOccupied == NULL)
 	{
 		headOfOccupied = targetNode;
 		targetNode->nextBlock = NULL;
@@ -300,14 +282,13 @@ void orderNewlyAllocatedNode(header *targetNode)
 	}
 	else
 	{
+		headOfOccupied->prevBlock = targetNode;
 		targetNode->nextBlock = headOfOccupied;
 		targetNode->prevBlock = NULL;
-		headOfOccupied->prevBlock = targetNode;
 		headOfOccupied = targetNode;
 	}
-
-	// what if I just don't...
-	/*while (1)
+	/*
+	while (1)
 	{
 		// Case: we've reached the end of the allocated list
 		if (currentNode->nextBlock == NULL)
@@ -550,4 +531,9 @@ void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOf
 	{
 		headOfFree = leftOverFreeChunk;
 	}
+}
+
+void printTimesCalled()
+{
+	printf("Times called 1: %i, times called 2: %i \n", timesCalled1, timesCalled2);
 }

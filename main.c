@@ -34,12 +34,11 @@ int main(int argc, char *argv[])
 		void *mem4 = t_malloc(i * 50);
 		mallocs[i] = mem4;
 	}
-
 	end = clock();
 	cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
 	printf("Time taken for allocation: %f seconds\n", cpu_time_used);
 
-	
+
 	start = clock();
 	for (int i = 0; i < 25000; i++)
 	{
