@@ -1,3 +1,40 @@
+This thread contains submission instructions and clarifications for programming assignment 6. If anything is missing or unclear, make a comment below so others can see it. Anonymous comments are enabled for this thread.
+
+Please see any edits to the post at the bottom.
+
+
+Starter Code:
+Please use these interfaces in this starter file in your code. You can upload this to the lab machines (use scp or drag it into VS Code) and then go to the folder your want the starter code to be in and run unzip /path/to/hw6_starter.zip.
+
+File
+hw6_starter.zip
+The functions you need to implement are in the libtdmm/tdmm.c file and the interfaces are established are in tdmm.h. You can write your tests in main.c. Please use this starter code as it will compile your code into a library. We'd recommend using the CMake Tools extension to get a visual debugger and automate the build system provided in the starter code.
+
+(tdmm = t dynamic memory management)
+
+
+Submission Instructions:
+The following are the main deliverables:
+
+Your source code
+
+Please keep the provided build.sh script and CMakeLists.txt files in the starter code
+
+Your testing code
+
+For this assignment, your testing code should consist of tests to measure the required performance metrics as well as any necessary unit tests
+
+Your report comparing the 3 allocation policies (in PDF format)
+
+A README with your name and EID, as well as instructions on how to compile and run your code
+
+Submit to Gradescope:
+
+There will be two Gradescope assignments, one for your code and one for your report
+
+Review tests that you missed. There may be hidden tests
+
+
 Clarifications:
 TDMM:
 
@@ -10,4 +47,399 @@ Memory Utilization:
 You can choose to write any test program to measure this metric (the amount to malloc, number of times to malloc, the total allocation size, etc.). Be sure to justify your approach.
 
 The "time" is in terms of allocation and deallocation events
+
+
+Edit 1: Removed garbage collection from starter code
+
+Comment
+
+Sort by Newest 
+Anonymous Mantis
+1d
+When my user requests a certain number of bytes, I align it to be a multiple of 4. When keeping track of stats for my report, should I use the aligned number of bytes in my data or the original number of bytes that my user requested initially? 
+
+
+Reply
+
+Hantao Jin
+1d
+Aligned; that would be the sizes of the blocks of memory that are allocated/free in your heap
+
+
+1
+Reply
+
+Anonymous Sand Dollar
+1d
+When we call mmap, does it give you a random address or can we just append it to the end of current memory? 
+
+
+Reply
+
+Hantao Jin
+1d
+It may not give you a chunk of memory that is necessarily contiguous with your current heap (like it doesn't have to follow immediately from your current heap)
+
+
+Reply
+
+Anonymous Dugong
+1d
+if the chunk of memory isn't contiguous--for example, its return address is a value in between pointer addresses in your heap--should you add the memory where it should go chronologically or just add it to the end of the heap
+
+
+Reply
+
+Hantao Jin
+1d
+ Replying to Anonymous Dugong
+mmap always gives a contiguous block of memory; I meant that between mmaps, it won't necessarily give you an address that immediately follows the block from the previous mmap.
+
+So you won't get an address from mmap that's within your current heap
+
+
+Reply
+
+Anonymous Mantis
+1d
+ Replying to Hantao Jin
+Should we sort the blocks of memory we get from mmap so that our memory links are in order of their addresses?
+
+
+Reply
+
+Hantao Jin
+1d
+ Replying to Anonymous Mantis
+Doesn't really matter; depends if you think it's necessary for your implementation.
+
+
+Reply
+
+Anonymous Dunlin
+1d
+Will gradescope be out by today?
+
+
+Reply
+
+Hantao Jin
+1d
+TBD
+
+
+Reply
+
+Anonymous Dunlin
+1d
+What is expected of the report? Are there an expected number of graphs, a word limit (upper or lower)? Does it need to be polished and well typed (like a research paper via LateX)? 
+
+
+Reply
+
+Hantao Jin
+1d
+No graphs requirements or word limits, but please make it readable and your analysis clear. For example, if you aren't using graphs, you're gonna need some good way to convey your results to us so it's not confusing
+
+
+Reply
+
+Anonymous Dunlin
+1d
+What's the point of having a build.sh pre-done for us?
+
+
+Reply
+
+Hantao Jin
+1d
+It compiles your code to a libtdmm.a library that we use; please keep the build.sh file
+
+
+Reply
+
+Anonymous Dunlin
+2d
+How do we return error for free
+
+
+Reply
+
+Hantao Jin
+2d
+Under what conditions? If you attempt to free a null pointer or already freed block, then t_free does nothing (it just moves on)
+
+
+Reply
+
+Anonymous Dunlin
+2d
+What about if os runs out of memroy
+
+
+Reply
+
+Jason Xie
+2d
+ Replying to Anonymous Dunlin
+you can error like normal
+
+
+Reply
+
+Hantao Jin
+2d
+ Replying to Anonymous Dunlin
+In reality, the OS "running out of memory" doesn't really happen due to something called virtual memory, which is huge for 64-bit systems and won't come remotely close to happening for the Gradescope tests. Just check if the mmap call returns successfully or MAP_FAILED.
+
+
+Reply
+
+Anonymous Dunlin
+2d
+So suppose, i deicde to call t_init a second time after already mallocing for sometime. Do I need to do anything to the currently allocated memory like giving it back to the OS, or do I just let the user keep it?
+
+
+Reply
+
+Hantao Jin
+2d
+You can leave it as is for this prog; the OS reclaims the memory once your entire program finishes.
+
+Obviously, in a real program, heap initialization is something that happens once before the main() function begins, and there's no real way to forcefully reset the heap (in like libc, for example)
+
+
+Reply
+
+Anonymous Kangaroo
+2d
+Given your linked list struct stores sizes,  boolean of free, and pointers. Do we just set all boolean for free to true in case init is called when it was already called in the past?
+
+
+Reply
+
+Derick Lee
+2d
+ Replying to Anonymous Kangaroo
+Yes, this is fine. Note that t_init() is only intended to be called at the start of a program, however. There isn't a need to ever call it again in the middle of a program. 
+
+
+Reply
+
+Anonymous Kangaroo
+1d
+ Replying to Derick Lee
+instead of having a pointer a field what if if we make the actual memory locations of the pointers in the linked list be at the mmap memory? Otherwise wouldn't the ptr of the struct be null
+
+
+Reply
+
+Ojas Phirke
+1d
+ Replying to Anonymous Kangaroo
+i think what you are describing would work?
+
+im not sure I completely understood though, could you give an example or something
+
+
+Reply
+
+Ojas Phirke
+1d
+just adding a bit to what the others have said:
+
+calling t_init() twice is undefined (just like how passing an arbitrary pointer, not returned by malloc to free gives undefined behavior)
+
+i.e. you are free to handle it however you like
+
+
+Reply
+
+Anonymous Herring
+2d
+How do we choose between the three types of allocation algorithms at runtime? Is there some input that specifies the one we should use for that run?
+
+
+Reply
+
+Derick Lee
+2d
+The strategy will be passed into the t_init() function and every subsequent call to t_malloc() and t_free() would assume that strategy unless t_init() was called again with a different strategy. Hence, when you're testing your code you would call t_init() with a given allocation strategy and your program should handle allocations/deallocations accordingly.
+
+
+Reply
+
+Anonymous Pelican
+2d
+What's the expected behavior for when a user calls delete on memory that hasn't been allocated yet? 
+
+
+Reply
+
+Derick Lee
+2d
+I'm assuming you mean attempting to free a null pointer or a pointer that has been freed already. 
+
+You can print to stderr but do not exit. The program should continue after recognizing a pointer isn't pointing to allocated memory.
+
+
+Reply
+
+Anonymous Mantis
+2d
+if a malloc request is made for a non-multiple of 4 number, should we error or just return a multiple of 4 that's bigger than the request?
+
+
+Reply
+
+Hantao Jin
+2d
+The latter
+
+
+Reply
+
+Anonymous Turkey
+2d
+Are we intended to store the chunk metadata with the data (as libc malloc does), or in a separate mmapped memory section which is safer (but requires more memory to maintain)?
+
+
+Reply
+
+Derick Lee
+2d
+I would recommend storing the metadata with the data
+
+
+1
+Reply
+
+Ojas Phirke
+1d
+but you are free to implement it however you like (there are many interesting data structures and algorithms you can use/come up with to optimize this task)
+
+
+Reply
+
+Anonymous Dunlin
+3d
+Do we need to handle errors? If so, how?
+
+
+Reply
+
+Hantao Jin
+3d
+Print to stderr and exit with non zero status code per usual, but there shouldn't really be any errors other than like an mmap call failing or something 
+
+
+Reply
+
+Anonymous Dunlin
+3d
+When you call init, do you reset the heap? Like everything you currently store isgone?
+
+
+Reply
+
+Hantao Jin
+3d
+Yes
+
+
+Reply
+
+Anonymous Dunlin
+3d
+What are the time complexity requirements? What are the space complexity requirements? What level of allocations am I expected to account for? How big can an allocation be? Can one do t_malloc(2,000,000,000)
+
+
+Reply
+
+Hantao Jin
+3d
+No strict requirements, though it should pass all Gradescope tests. You need to account for allocations of any size.
+
+
+Reply
+
+Anonymous Walrus
+3d
+Can I add stuff to the tdmm.h file?
+
+
+Reply
+
+Hantao Jin
+3d
+Yes
+
+
+Reply
+
+Anonymous Dunlin
+3d
+Can i change parameters to the functions?
+
+
+Reply
+
+Hantao Jin
+3d
+ Replying to Anonymous Dunlin
+No
+
+
+Reply
+
+Anonymous Seahorse
+3d
+When the assignment description says that "All your data structure should be allocated on the region returned by mmap. Usage of llibc’s malloc is not allowed." Does it mean that we aren't allowed to create a LinkedList / Map using malloc? We have to allocate our data structures with mmap?
+
+
+Reply
+
+Derick Lee
+3d
+Yes
+
+
+1
+Reply
+
+Anonymous Tiger
+3d
+A garbage collector is present in the starter code, but it is not listed in the project description on Canvas. Should we still implement the garbage collector?
+
+
+Reply
+
+Derick Lee
+3d
+No, you don't need to implement this
+
+
+Reply
+
+Hantao Jin
+3d
+We've removed the garbage collection method from the starter code
+
+
+Reply
+
+Anonymous Dunlin
+3d
+so since it's removed, do we need to implement it now?
+
+
+Reply
+
+Hantao Jin
+3d
+ Replying to Anonymous Dunlin
+No
+
+
+Reply
 

@@ -8,36 +8,49 @@
 header *headOfFree;
 header *headOfOccupied;
 alloc_strat_e currentMode;
-int currentAmountAllocated;
+unsigned long long int currentAmountAllocated;
+unsigned long long int currentBytesRequested;
 int alignmentSize;
-int timesCalled1 = 0;
-int timesCalled2 = 0;
+int pageSize;
+int numRegions = 0;
 
 // TODO: do some integrity checks with the 0xDEADBEEF value to actually use it.
 void t_init(alloc_strat_e strat)
 {
-	alignmentSize = sysconf(_SC_PAGESIZE); // because mmap already has its own internal alignment -- so if we don't do this, we're just wasting memory
-	currentAmountAllocated = 32768 + sizeof(header);
+	currentBytesRequested = 0;
+	alignmentSize = 4; // sysconf(_SC_PAGESIZE);
+	pageSize = sysconf(_SC_PAGESIZE);
+	currentAmountAllocated = 32768;
+	headOfOccupied = NULL;
+	numRegions = 0;
 	// set how we're gonna do this
 	currentMode = strat;
 
 	// arbitrarily deciding to allocate 32kib of data
 	// should be aligned
-	headOfFree = (header *)mmap(NULL, currentAmountAllocated, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	printf("%p\n", headOfFree);
-	if (headOfFree == MAP_FAILED)
+	void *mmapBase = mmap(NULL, currentAmountAllocated, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	// printf("%p\n", headOfFree);
+	if (mmapBase == MAP_FAILED)
 	{
 		throwError("ERROR! FAILED TO ALLOCATE MORE MEMORY!\n");
 	}
+	numRegions++;
+	headOfFree = (header *)((char *)mmapBase + sizeof(footer));
 	headOfFree->isFree = 1;
-	headOfFree->size = 32768 + sizeof(header);
+	headOfFree->size = 32768 - sizeof(footer) - sizeof(header);
 	headOfFree->prevBlock = NULL;
 	headOfFree->nextBlock = NULL;
 	headOfFree->protectionBlock = 0xDEADBEEF; // a fun thing that's pretty common in network stuff too -- validates that header hasn't been corrupted
+
+	footer *footOfFree = (footer *)((char *)headOfFree + (headOfFree->size - sizeof(footer)));
+	footOfFree->isFree = 1;
+	footOfFree->size = headOfFree->size;
+	footOfFree-> protectionBlock = 0xDEADBEEF;
 }
 
 void *t_malloc(size_t size)
 {
+	currentBytesRequested += alignSize(size);
 	// We need to implement 3 different methods -- best fit, worst fit, and first fit
 	if (currentMode == FIRST_FIT)
 	{
@@ -58,22 +71,27 @@ void *doFirstFit(size_t size)
 {
 	if (headOfFree == NULL)
 	{
-		allocateMoreMemory(32768 + sizeof(header));
+		allocateMoreMemory(32768);
 	}
+
 	header *currentNode = headOfFree;
-	size_t sizePostHeader = size + sizeof(header);
+	footer *currentFooter;
+
+	size_t sizePostHeader = size + sizeof(header) + sizeof(footer);
 	sizePostHeader = alignSize(sizePostHeader);
 	while (1)
 	{
+		currentFooter = (footer *)((char *)currentNode + (currentNode->size - sizeof(footer)));
 		if (currentNode->size >= sizePostHeader)
 		{
 			// large enough for us to do stuff!
 			size_t sizeOfSegmentAfterAlloc = currentNode->size - sizePostHeader;
 
 			// if we split this, the next chunk is literally too small for us to use, so let's just give the whole block of memory to this block so we don't lose it
-			if (sizeOfSegmentAfterAlloc < alignSize(sizeof(header) + 1))
+			if (sizeOfSegmentAfterAlloc < alignSize(sizeof(header) + sizeof(footer) + 1))
 			{
 				currentNode->isFree = 0;
+				currentFooter->isFree = 0;
 				// cut out from the free list
 				if (currentNode == headOfFree)
 				{
@@ -112,6 +130,7 @@ void *doFirstFit(size_t size)
 			}
 		}
 	}
+	currentFooter-> protectionBlock = 0xDEADBEEF;
 	return (void *)(currentNode + 1);
 }
 
@@ -126,6 +145,7 @@ void t_free(void *ptr)
 	// jankify way hehe:
 	if (currentNodeStart->protectionBlock == 0xDEADBEEF && currentNodeStart->isFree == 0)
 	{
+		currentBytesRequested -= (currentNodeStart->size - sizeof(header) - sizeof(footer));
 		// we'll pretend this is good enough to validate that we found a legit pointer...
 		//  we found it, now do the freeing stuff
 		if (currentNodeStart == headOfOccupied)
@@ -154,6 +174,9 @@ void t_free(void *ptr)
 			currentNodeStart->isFree = 1;
 			orderNewFreeData(currentNodeStart);
 		}
+		footer *footOfCurrentNode = (footer *)((char *)currentNodeStart + (currentNodeStart->size - sizeof(footer)));
+		footOfCurrentNode->isFree = 1;
+		footOfCurrentNode -> protectionBlock = 0xDEADBEEF;
 	}
 	else
 	{
@@ -207,16 +230,24 @@ void t_free(void *ptr)
 
 void allocateMoreMemory(size_t amountOfMemNeeded)
 {
-	size_t additionalMem = alignSize(amountOfMemNeeded);
+	// we have to allocate additional mem based on the page size since mmap gives mem based on page size I think
+	size_t additionalMem = ((amountOfMemNeeded + pageSize - 1) / pageSize) * pageSize;
 	currentAmountAllocated += additionalMem;
-	header *newSegment = (header *)mmap(NULL, additionalMem, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (newSegment == MAP_FAILED)
+	void *newBase = mmap(NULL, additionalMem, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (newBase == MAP_FAILED)
 	{
 		throwError("ERROR! FAILED TO ALLOCATE MORE MEMORY!\n");
 	}
+	numRegions++;
+	header *newSegment = (header *)((char *)newBase + sizeof(footer));
 	newSegment->isFree = 1;
 	newSegment->protectionBlock = 0xDEADBEEF;
-	newSegment->size = additionalMem;
+	newSegment->size = additionalMem - sizeof(footer) - sizeof(header);
+
+	footer *newSegFooter = (footer *)((char *)newSegment + (newSegment->size - sizeof(footer)));
+	newSegFooter->size = newSegment->size;
+	newSegFooter->isFree = 1;
+	newSegFooter -> protectionBlock = 0xDEADBEEF;
 	orderNewFreeData(newSegment);
 }
 
@@ -326,7 +357,7 @@ void *doBestFit(size_t size)
 		allocateMoreMemory(32768 + sizeof(header));
 	}
 	header *currentNode = headOfFree;
-	size_t sizePostHeader = size + sizeof(header);
+	size_t sizePostHeader = size + sizeof(header) + sizeof(footer);
 	sizePostHeader = alignSize(sizePostHeader);
 	header *smallestSectionSoFar = NULL;
 
@@ -356,11 +387,13 @@ void *doBestFit(size_t size)
 	}
 	currentNode = smallestSectionSoFar;
 	size_t sizeOfSegmentAfterAlloc = currentNode->size - sizePostHeader;
-
+	footer *currentFooter = (footer *)((char *)currentNode + (currentNode->size - sizeof(footer)));
+currentFooter-> protectionBlock = 0xDEADBEEF;
 	// if we split this, the next chunk is literally too small for us to use, so let's just give the whole block of memory to this block so we don't lose it
-	if (sizeOfSegmentAfterAlloc < alignSize(sizeof(header) + 1))
+	if (sizeOfSegmentAfterAlloc < alignSize(sizeof(header) + sizeof(footer) + 1))
 	{
 		currentNode->isFree = 0;
+		currentFooter->isFree = 0;
 		// cut out from the free list
 		if (currentNode == headOfFree)
 		{
@@ -391,7 +424,7 @@ void *doWorstFit(size_t size)
 		allocateMoreMemory(32768 + sizeof(header));
 	}
 	header *currentNode = headOfFree;
-	size_t sizePostHeader = size + sizeof(header);
+	size_t sizePostHeader = size + sizeof(header) + sizeof(footer);
 	sizePostHeader = alignSize(sizePostHeader);
 	header *largestSectionSoFar = NULL;
 
@@ -421,11 +454,13 @@ void *doWorstFit(size_t size)
 	}
 	currentNode = largestSectionSoFar;
 	size_t sizeOfSegmentAfterAlloc = currentNode->size - sizePostHeader;
-
+	footer *currentFooter = (footer *)((char *)currentNode + (currentNode->size - sizeof(footer)));
+	currentFooter -> protectionBlock = 0xDEADBEEF;
 	// if we split this, the next chunk is literally too small for us to use, so let's just give the whole block of memory to this block so we don't lose it
-	if (sizeOfSegmentAfterAlloc < alignSize(sizeof(header) + 1))
+	if (sizeOfSegmentAfterAlloc < alignSize(sizeof(header) + sizeof(footer) + 1))
 	{
 		currentNode->isFree = 0;
+		currentFooter->isFree = 0;
 		// cut out from the free list
 		if (currentNode == headOfFree)
 		{
@@ -450,55 +485,45 @@ void *doWorstFit(size_t size)
 	return (void *)(currentNode + 1);
 }
 
-int getSysReqMem()
+size_t getSysReqMem()
 {
 	return currentAmountAllocated;
 }
 
-void coalesceFreeSections()
-{
-	header *currentNode = headOfFree;
-	if (currentNode == NULL)
-	{
-		return;
-	}
-	while (currentNode != NULL && currentNode->nextBlock != NULL)
-	{
-		if ((char *)currentNode + currentNode->size == currentNode->nextBlock)
-		{
-			currentNode->size = currentNode->size + currentNode->nextBlock->size;
-			currentNode->nextBlock = currentNode->nextBlock->nextBlock;
-			if (currentNode->nextBlock != NULL)
-				currentNode->nextBlock->prevBlock = currentNode;
-		}
-		else
-		{
-			currentNode = currentNode->nextBlock;
-		}
-	}
-}
-
 void coalesceFreeSectionsV2(header *currentNode)
 {
-	if (currentNode->nextBlock != NULL)
-	{
-		if ((char *)(currentNode) + currentNode->size == currentNode->nextBlock)
-		{
-			currentNode->size = currentNode->size + currentNode->nextBlock->size;
-			currentNode->nextBlock = currentNode->nextBlock->nextBlock;
-			if (currentNode->nextBlock != NULL)
-				currentNode->nextBlock->prevBlock = currentNode;
+	header *theoreticallyNextHeader = (header *)((char *)currentNode + currentNode->size);
+	if(theoreticallyNextHeader->protectionBlock == 0xDEADBEEF){
+		if(theoreticallyNextHeader->isFree == 1){
+			currentNode->size += theoreticallyNextHeader->size;
+			if(theoreticallyNextHeader->prevBlock != NULL)
+				theoreticallyNextHeader->prevBlock->nextBlock = theoreticallyNextHeader->nextBlock;
+			else
+				headOfFree = theoreticallyNextHeader->nextBlock;
+			if(theoreticallyNextHeader->nextBlock != NULL)
+				theoreticallyNextHeader->nextBlock->prevBlock = theoreticallyNextHeader->prevBlock;
+			footer *mergedFooter = (footer *)((char *)currentNode + currentNode->size - sizeof(footer));
+			mergedFooter->size = currentNode->size;
+			mergedFooter->isFree = 1;
+			mergedFooter->protectionBlock = 0xDEADBEEF;
 		}
 	}
-	if (currentNode->prevBlock != NULL)
-	{
-		if ((char *)(currentNode)-currentNode->prevBlock->size == currentNode->prevBlock)
-		{
-			currentNode = currentNode->prevBlock; // go back one so I can be lazy and just recycle the same logic as above
-			currentNode->size = currentNode->size + currentNode->nextBlock->size;
-			currentNode->nextBlock = currentNode->nextBlock->nextBlock;
-			if (currentNode->nextBlock != NULL)
-				currentNode->nextBlock->prevBlock = currentNode;
+
+	footer *theoreticallyFooter = ((footer *)((char *)currentNode - sizeof(footer)));
+	if(theoreticallyFooter->protectionBlock == 0xDEADBEEF){
+		if(theoreticallyFooter->isFree == 1){
+			header *headerOfPrevious = (header *)((char *)currentNode - theoreticallyFooter->size);
+			headerOfPrevious->size += currentNode->size;
+			if(currentNode->prevBlock != NULL)
+				currentNode->prevBlock->nextBlock = currentNode->nextBlock;
+			else
+				headOfFree = currentNode->nextBlock;
+			if(currentNode->nextBlock != NULL)
+				currentNode->nextBlock->prevBlock = currentNode->prevBlock;
+			footer *mergedFooter = (footer *)((char *)headerOfPrevious + headerOfPrevious->size - sizeof(footer));
+			mergedFooter->size = headerOfPrevious->size;
+			mergedFooter->isFree = 1;
+			mergedFooter->protectionBlock = 0xDEADBEEF;
 		}
 	}
 }
@@ -513,11 +538,17 @@ void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOf
 	}
 	// initialize the new next chunk first
 	header *leftOverFreeChunk = (header *)((char *)currentNode + sizePostHeader);
+
 	leftOverFreeChunk->isFree = 1;
 	leftOverFreeChunk->nextBlock = currentNode->nextBlock;
 	leftOverFreeChunk->size = sizeOfSegmentAfterAlloc;
 	leftOverFreeChunk->prevBlock = currentNode->prevBlock;
 	leftOverFreeChunk->protectionBlock = 0xDEADBEEF;
+	footer *footOfLeftover = (footer *)((char *)leftOverFreeChunk + (leftOverFreeChunk->size - sizeof(footer)));
+	footOfLeftover->isFree = 1;
+	footOfLeftover->size = sizeOfSegmentAfterAlloc;
+	footOfLeftover -> protectionBlock = 0xDEADBEEF;
+	
 	if (leftOverFreeChunk->prevBlock)
 		leftOverFreeChunk->prevBlock->nextBlock = leftOverFreeChunk;
 	if (leftOverFreeChunk->nextBlock)
@@ -525,6 +556,11 @@ void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOf
 
 	currentNode->size = sizePostHeader;
 	currentNode->isFree = 0;
+
+	footer *footOfCurrentNode = (footer *)((char *)currentNode + (currentNode->size - sizeof(footer)));
+	footOfCurrentNode->size = sizePostHeader;
+	footOfCurrentNode->isFree = 0;
+	footOfCurrentNode -> protectionBlock = 0xDEADBEEF;
 	orderNewlyAllocatedNode(currentNode);
 
 	if (needUpdateFirstNode)
@@ -533,7 +569,8 @@ void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOf
 	}
 }
 
-void printTimesCalled()
+double memoryUtilizationPercentage()
 {
-	printf("Times called 1: %i, times called 2: %i \n", timesCalled1, timesCalled2);
+	printf("%llu      %llu\n", currentBytesRequested, currentAmountAllocated);
+	return ((double)currentBytesRequested / (double)currentAmountAllocated) * 100.0;
 }

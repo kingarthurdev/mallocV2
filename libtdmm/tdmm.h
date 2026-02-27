@@ -12,23 +12,32 @@ typedef struct header
 	int protectionBlock;
 } header;
 
+typedef struct footer
+{
+	size_t size;
+	int isFree;
+	int protectionBlock;
+} footer;
+
 void throwError(char *message);
-void* doFirstFit(size_t size);
-void* doBestFit(size_t size);
-void* doWorstFit(size_t size);
+void *doFirstFit(size_t size);
+void *doBestFit(size_t size);
+void *doWorstFit(size_t size);
 void allocateMoreMemory();
 size_t alignSize(size_t sizeOfDataPlusHeader);
 void orderNewlyAllocatedNode(header *targetNode);
 void orderNewFreeData(header *address);
-int getSysReqMem();
+size_t getSysReqMem();
 void coalesceFreeSections();
 void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOfSegmentAfterAlloc);
 void coalesceFreeSectionsV2(header *currentNode);
+double memoryUtilizationPercentage();
 
-typedef enum {
-  FIRST_FIT,
-  BEST_FIT,
-  WORST_FIT,
+typedef enum
+{
+	FIRST_FIT,
+	BEST_FIT,
+	WORST_FIT,
 } alloc_strat_e;
 
 /**
