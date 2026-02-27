@@ -124,7 +124,7 @@ void t_free(void *ptr)
 
 	header *currentNodeStart = (header *)(ptr)-1;
 	// jankify way hehe:
-	if (currentNodeStart->protectionBlock == 0xDEADBEEF)
+	if (currentNodeStart->protectionBlock == 0xDEADBEEF && currentNodeStart->isFree == 0)
 	{
 		// we'll pretend this is good enough to validate that we found a legit pointer...
 		//  we found it, now do the freeing stuff
