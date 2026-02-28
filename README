@@ -10,3 +10,4 @@ You can compile this program by running the ```build.sh``` file in the top direc
 After compiling the program, you can run it by changing your directory to the build directory and running hw6 to generate the outputs for the report. Alternatively, for the library itself, you can use the contents of the libtdmm folder within the build directory, using that as a custom library for further testing. 
 
 ### Tests
+The tests for this prog are contained in main.c. They include the tests necessary for the report as well as well as basic tests for functionality and unit tests to verify that the program works properly. 

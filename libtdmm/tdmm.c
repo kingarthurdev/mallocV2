@@ -13,16 +13,18 @@ unsigned long long int currentBytesRequested;
 int alignmentSize;
 int pageSize;
 int numRegions = 0;
+int numBlocks = 0;
 
 // TODO: do some integrity checks with the 0xDEADBEEF value to actually use it.
 void t_init(alloc_strat_e strat)
 {
 	currentBytesRequested = 0;
-	alignmentSize = 4; // sysconf(_SC_PAGESIZE);
+	alignmentSize = sysconf(_SC_PAGESIZE);
 	pageSize = sysconf(_SC_PAGESIZE);
 	currentAmountAllocated = 32768;
 	headOfOccupied = NULL;
 	numRegions = 0;
+	numBlocks = 1;
 	// set how we're gonna do this
 	currentMode = strat;
 
@@ -121,8 +123,7 @@ void *doFirstFit(size_t size)
 			if (currentNode->nextBlock == NULL)
 			{
 				// did not find a suitable block, need to allocate more memory
-				allocateMoreMemory(sizePostHeader);
-				currentNode = headOfFree;
+				currentNode = allocateMoreMemory(sizePostHeader);
 			}
 			else
 			{
@@ -228,10 +229,10 @@ void t_free(void *ptr)
 	coalesceFreeSectionsV2(currentNodeStart);
 }
 
-void allocateMoreMemory(size_t amountOfMemNeeded)
+header *allocateMoreMemory(size_t amountOfMemNeeded)
 {
 	// we have to allocate additional mem based on the page size since mmap gives mem based on page size I think
-	size_t additionalMem = ((amountOfMemNeeded + pageSize - 1) / pageSize) * pageSize;
+	size_t additionalMem = ((amountOfMemNeeded + pageSize - 1) / pageSize) * pageSize + sizeof(header) + sizeof(footer);
 	currentAmountAllocated += additionalMem;
 	void *newBase = mmap(NULL, additionalMem, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (newBase == MAP_FAILED)
@@ -239,6 +240,7 @@ void allocateMoreMemory(size_t amountOfMemNeeded)
 		throwError("ERROR! FAILED TO ALLOCATE MORE MEMORY!\n");
 	}
 	numRegions++;
+	numBlocks++;
 	header *newSegment = (header *)((char *)newBase + sizeof(footer));
 	newSegment->isFree = 1;
 	newSegment->protectionBlock = 0xDEADBEEF;
@@ -249,6 +251,7 @@ void allocateMoreMemory(size_t amountOfMemNeeded)
 	newSegFooter->isFree = 1;
 	newSegFooter -> protectionBlock = 0xDEADBEEF;
 	orderNewFreeData(newSegment);
+	return newSegment;
 }
 
 void orderNewFreeData(header *address)
@@ -372,8 +375,8 @@ void *doBestFit(size_t size)
 		{
 			if (smallestSectionSoFar == NULL)
 			{
-				allocateMoreMemory(sizePostHeader);
-				currentNode = headOfFree;
+				smallestSectionSoFar = allocateMoreMemory(sizePostHeader);
+				break;
 			}
 			else
 			{
@@ -439,8 +442,8 @@ void *doWorstFit(size_t size)
 		{
 			if (largestSectionSoFar == NULL)
 			{
-				allocateMoreMemory(sizePostHeader);
-				currentNode = headOfFree;
+				largestSectionSoFar = allocateMoreMemory(sizePostHeader);
+				break;
 			}
 			else
 			{
@@ -495,6 +498,7 @@ void coalesceFreeSectionsV2(header *currentNode)
 	header *theoreticallyNextHeader = (header *)((char *)currentNode + currentNode->size);
 	if(theoreticallyNextHeader->protectionBlock == 0xDEADBEEF){
 		if(theoreticallyNextHeader->isFree == 1){
+			numBlocks--;
 			currentNode->size += theoreticallyNextHeader->size;
 			if(theoreticallyNextHeader->prevBlock != NULL)
 				theoreticallyNextHeader->prevBlock->nextBlock = theoreticallyNextHeader->nextBlock;
@@ -512,6 +516,7 @@ void coalesceFreeSectionsV2(header *currentNode)
 	footer *theoreticallyFooter = ((footer *)((char *)currentNode - sizeof(footer)));
 	if(theoreticallyFooter->protectionBlock == 0xDEADBEEF){
 		if(theoreticallyFooter->isFree == 1){
+			numBlocks--;
 			header *headerOfPrevious = (header *)((char *)currentNode - theoreticallyFooter->size);
 			headerOfPrevious->size += currentNode->size;
 			if(currentNode->prevBlock != NULL)
@@ -554,6 +559,7 @@ void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOf
 	if (leftOverFreeChunk->nextBlock)
 		leftOverFreeChunk->nextBlock->prevBlock = leftOverFreeChunk;
 
+	numBlocks++;
 	currentNode->size = sizePostHeader;
 	currentNode->isFree = 0;
 
@@ -572,4 +578,9 @@ void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOf
 double memoryUtilizationPercentage()
 {
 	return ((double)currentBytesRequested / (double)currentAmountAllocated) * 100.0;
+}
+
+size_t getOverheadBytes()
+{
+	return numBlocks * (sizeof(header) + sizeof(footer));
 }

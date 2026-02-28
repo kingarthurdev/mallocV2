@@ -3,22 +3,29 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <stdint.h>
+#define PASS(name) printf("PASS: " name "\n"); //ooh this apparently works and is cooler than a function lol
+
 
 void basicTestingBenchmarks();
 void getAverageUtilizationPercentages();
+void speedsWithMemorySize();
+void overheadWithProgramRun();
+void unitTests();
 
 int main(int argc, char *argv[])
 {
-	// basicTestingBenchmarks();
+	basicTestingBenchmarks();
+	unitTests();
 	getAverageUtilizationPercentages();
-
+	speedsWithMemorySize();
+	overheadWithProgramRun();
 	return 0;
 }
 
 // basic test to ensure performance
 void basicTestingBenchmarks()
 {
-	printf("hello???");
 	clock_t start, end;
 	double cpu_time_used;
 
@@ -30,18 +37,18 @@ void basicTestingBenchmarks()
 	void *temp = mem;
 	void *temp2 = mem3;
 
-	// printf("%p     %p     %p\n", mem, mem2, mem3);
-	// printf("%i\n", getSysReqMem());
+	printf("%p     %p     %p\n", mem, mem2, mem3);
+	printf("%i\n", getSysReqMem());
 	t_free(mem);
 	t_free(mem2);
 	t_free(mem3);
 
 	mem3 = t_malloc(500000); // re-consume the previously allocated chunk
 	mem2 = t_malloc(100);	 // verify that the new thing equals the previous mem address
-	/*if (temp != mem2 || temp2 != mem3)
+	if (temp != mem2 || temp2 != mem3)
 	{
 		throwError("ERROR! Something's wrong with allocation order.");
-	}*/
+	}
 	// printf("%p     %p\n", mem2, mem3);
 	// printf("%i\n", getSysReqMem());
 
@@ -69,7 +76,7 @@ void basicTestingBenchmarks()
 
 	if (cpu_time_used > 2)
 	{
-		// throwError("ERROR! Too slow!");
+		throwError("ERROR! Too slow!");
 	}
 
 	printf("Basic allocation and time limit test passed!\n");
@@ -126,6 +133,159 @@ void getAverageUtilizationPercentages()
 		}
 		fclose(fpt);
 		fpt = NULL;
-		printf("Strategy: %s   |   Average Percent Utilization: %.2f\n", stratInText, memoryUtilizationPercentage());
+		printf("Strategy: %s   |   Average Percent Utilization: %.2f%%\n", stratInText, memoryUtilizationPercentage());
 	}
 }
+
+void speedsWithMemorySize()
+{
+	clock_t start, end;
+	double cpu_time_used;
+	alloc_strat_e strat;
+	char *stratInText = NULL;
+	FILE *fpt;
+	for (int i = 0; i < 3; i++)
+	{
+		switch (i)
+		{
+		case 0:
+			strat = FIRST_FIT;
+			stratInText = "FIRST_FIT";
+			fpt = fopen("FIRST_FIT_TIME.csv", "w+");
+			break;
+		case 1:
+			strat = BEST_FIT;
+			stratInText = "BEST_FIT";
+			fpt = fopen("BEST_FIT_TIME.csv", "w+");
+			break;
+		case 2:
+			strat = WORST_FIT;
+			stratInText = "WORST_FIT";
+			fpt = fopen("WORST_FIT_TIME.csv", "w+");
+			break;
+		}
+		fprintf(fpt, "Bytes Allocated, Malloc Time Taken, Free Time Taken\n");
+		t_init(strat);
+
+		for (int i = 0; i < 8388608; i++)
+		{
+			void *temp;
+			start = clock();
+			temp = t_malloc(i);
+			end = clock();
+			cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+			fprintf(fpt, "%i, %f,", i, cpu_time_used);
+			
+			start = clock();
+			t_free(temp);
+			end = clock();
+			cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
+			fprintf(fpt, "%f\n", cpu_time_used);
+
+		}
+		fclose(fpt);
+		fpt = NULL;
+	}
+}
+
+void overheadWithProgramRun(){
+	int max = 3200; // max bytes I wanna allocate
+	alloc_strat_e strat;
+	char *stratInText = NULL;
+	FILE *fpt;
+	for (int i = 0; i < 3; i++)
+	{
+		switch (i)
+		{
+		case 0:
+			strat = FIRST_FIT;
+			stratInText = "FIRST_FIT";
+			fpt = fopen("FIRST_FIT_OVERHEAD.csv", "w+");
+			break;
+		case 1:
+			strat = BEST_FIT;
+			stratInText = "BEST_FIT";
+			fpt = fopen("BEST_FIT_OVERHEAD.csv", "w+");
+			break;
+		case 2:
+			strat = WORST_FIT;
+			stratInText = "WORST_FIT";
+			fpt = fopen("WORST_FIT_OVERHEAD.csv", "w+");
+			break;
+		}
+		fprintf(fpt, "Iteration, Overhead Bytes\n");
+		int externalCount = 0;
+
+		t_init(strat);
+		srand(time(NULL));
+		void *addresses[500];
+		int count = 0;
+		for (int i = 0; i < 500; i++)
+		{
+			externalCount++;
+			void *asdf = t_malloc(rand() % (max + 1));
+			addresses[i] = asdf;
+			fprintf(fpt, "%i,%zu\n", externalCount, getOverheadBytes());
+			int randSelector = rand() % 11;
+			// 10% chance of freeing
+			if (randSelector == 10)
+			{
+				externalCount++;
+				t_free(addresses[count]);
+				fprintf(fpt, "%i,%zu\n", externalCount, getOverheadBytes());
+				count++;
+			}
+		}
+		fclose(fpt);
+		fpt = NULL;
+	}
+}
+
+void unitTests(){
+	t_init(FIRST_FIT);
+    void *p = t_malloc(64);
+    if (p == NULL) throwError("malloc returned NULL");
+    PASS("malloc returns non-NULL")
+
+    t_init(FIRST_FIT);
+    void *q = t_malloc(7);
+    if ((uintptr_t)q % 4 != 0) throwError("returned pointer not 4-byte aligned");
+    PASS("malloc pointer is 4-byte aligned")
+
+    t_init(FIRST_FIT);
+    void *r = t_malloc(128);
+    t_free(r);
+    PASS("free valid pointer does not crash")
+
+    t_init(FIRST_FIT);
+    if (getSysReqMem() == 0) throwError("getSysReqMem is 0 after init");
+    PASS("getSysReqMem nonzero after init")
+
+    t_init(FIRST_FIT);
+    t_malloc(64);
+    if (getOverheadBytes() == 0) throwError("getOverheadBytes is 0 after malloc");
+    PASS("getOverheadBytes nonzero after malloc")
+
+    t_init(FIRST_FIT);
+    void *a = t_malloc(64);
+    void *b = t_malloc(64);
+    size_t before = getOverheadBytes();
+    t_free(a);
+    t_free(b);
+    if (getOverheadBytes() > before) throwError("coalescing did not reduce overhead");
+    PASS("coalescing reduces overhead")
+
+    t_init(FIRST_FIT);
+    double util_before = memoryUtilizationPercentage();
+    t_malloc(1024);
+    if (memoryUtilizationPercentage() <= util_before) throwError("utilization did not increase after malloc");
+    PASS("utilization increases after malloc")
+
+    alloc_strat_e strats[] = {FIRST_FIT, BEST_FIT, WORST_FIT};
+    for (int i = 0; i < 3; i++) {
+        t_init(strats[i]);
+        if (t_malloc(256) == NULL) throwError("malloc returned NULL for a strategy");
+    }
+    PASS("all three strategies return non-NULL")
+}
+

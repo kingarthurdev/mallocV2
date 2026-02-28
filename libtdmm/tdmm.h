@@ -23,7 +23,7 @@ void throwError(char *message);
 void *doFirstFit(size_t size);
 void *doBestFit(size_t size);
 void *doWorstFit(size_t size);
-void allocateMoreMemory();
+header *allocateMoreMemory(size_t amountOfMemNeeded);
 size_t alignSize(size_t sizeOfDataPlusHeader);
 void orderNewlyAllocatedNode(header *targetNode);
 void orderNewFreeData(header *address);
@@ -32,6 +32,7 @@ void coalesceFreeSections();
 void splitCurrentBlock(header *currentNode, size_t sizePostHeader, size_t sizeOfSegmentAfterAlloc);
 void coalesceFreeSectionsV2(header *currentNode);
 double memoryUtilizationPercentage();
+size_t getOverheadBytes();
 
 typedef enum
 {
