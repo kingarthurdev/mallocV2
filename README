@@ -1,0 +1,13 @@
+
+### About
+Name: Arthur Chen
+EID: ac93957
+
+### Compilation
+You can compile this program by running the ```build.sh``` file in the top directory, and it will generate the ```hw6``` executable in the build directory which is responsible for generating tests/the data necessary for the report. Additionally, it will compile the t_malloc and t_free library into the libtdmm folder within the build directory. 
+
+### Execution
+After compiling the program, you can run it by changing your directory to the build directory and running hw6 to generate the outputs for the report. Alternatively, for the library itself, you can use the contents of the libtdmm folder within the build directory, using that as a custom library for further testing. 
+
+### Tests
+The tests for this prog are contained in main.c. They include the tests necessary for the report as well as well as basic tests for functionality and unit tests to verify that the program works properly. 
