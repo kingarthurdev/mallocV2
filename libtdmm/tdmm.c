@@ -25,7 +25,7 @@ int numBlocks = 0;
 int isMixed = 0;
 int currentPosInMaxSegs = 0;
 
-regionMap mapsOfTotalRegions[1000]; //lowk arbitrary decision to only be able to map 1000 different regions... hopefully doesn't bite me in the ass...
+regionMap mapsOfTotalRegions[10000]; // lowk arbitrary decision to only be able to map 1000 different regions... hopefully doesn't bite me in the ass...
 
 // TODO: do some integrity checks with the 0xDEADBEEF value to actually use it.
 void t_init(alloc_strat_e strat)
@@ -649,7 +649,7 @@ void *doBuddyFit(size_t size)
 		}
 	}
 	header *newlyAssigned = buddyBuckets[bucket];
-	if (newlyAssigned != NULL) //umm it shouldn't be null, but...
+	if (newlyAssigned != NULL) // umm it shouldn't be null, but...
 	{
 		newlyAssigned->isFree = 0;
 		newlyAssigned->protectionBlock = 0xDEADBEEF;
@@ -658,7 +658,9 @@ void *doBuddyFit(size_t size)
 			newlyAssigned->nextBlock->prevBlock = NULL;
 		newlyAssigned->nextBlock = NULL;
 		newlyAssigned->prevBlock = NULL;
-	}else{
+	}
+	else
+	{
 		throwError("ERMMMMM");
 	}
 	return (void *)(newlyAssigned + 1);
@@ -694,23 +696,24 @@ void doBuddyFree(void *ptr)
 
 void mergeHanging(header *hangingBlock)
 {
-	uintptr_t potentialNewAddr =((uintptr_t)hangingBlock ^ hangingBlock->size);
+	uintptr_t potentialNewAddr = ((uintptr_t)hangingBlock ^ hangingBlock->size);
 	header *buddyBlock = (header *)potentialNewAddr;
 	header *endBlock;
 	int shouldGo = 0;
 
-	for (int i = 0; i < currentPosInMaxSegs; i++) {
+	for (int i = 0; i < currentPosInMaxSegs; i++)
+	{
 		if ((uintptr_t)hangingBlock >= mapsOfTotalRegions[i].address &&
-		    (uintptr_t)hangingBlock < mapsOfTotalRegions[i].address + mapsOfTotalRegions[i].size)
+			(uintptr_t)hangingBlock < mapsOfTotalRegions[i].address + mapsOfTotalRegions[i].size)
 		{
 			if (potentialNewAddr >= mapsOfTotalRegions[i].address &&
-			    potentialNewAddr < mapsOfTotalRegions[i].address + mapsOfTotalRegions[i].size)
+				potentialNewAddr < mapsOfTotalRegions[i].address + mapsOfTotalRegions[i].size)
 				shouldGo = 1;
 			break;
 		}
 	}
 
-	if (shouldGo && (buddyBlock -> protectionBlock) == 0xDEADBEEF)
+	if (shouldGo && (buddyBlock->protectionBlock) == 0xDEADBEEF)
 	{
 		if ((buddyBlock->isFree) && (buddyBlock->size == hangingBlock->size))
 		{
@@ -762,6 +765,20 @@ void mergeHanging(header *hangingBlock)
 				buddyBuckets[bucket]->prevBlock = hangingBlock;
 				buddyBuckets[bucket] = hangingBlock;
 			}
+		}
+	}
+	else
+	{
+		int bucket = (int)ceil(log2(hangingBlock->size));
+		if (buddyBuckets[bucket] == NULL)
+		{
+			buddyBuckets[bucket] = hangingBlock;
+		}
+		else
+		{
+			hangingBlock->nextBlock = buddyBuckets[bucket];
+			buddyBuckets[bucket]->prevBlock = hangingBlock;
+			buddyBuckets[bucket] = hangingBlock;
 		}
 	}
 }

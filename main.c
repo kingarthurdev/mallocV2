@@ -18,8 +18,8 @@ void testSimpleBuddy2();
 int main(int argc, char *argv[])
 {
 	//basicTestingBenchmarks();
-	unitTests();
-	//getAverageUtilizationPercentages();
+	//unitTests();
+	getAverageUtilizationPercentages();
 	//speedsWithMemorySize();
 	//overheadWithProgramRun();
 	return 0;
@@ -113,10 +113,12 @@ void getAverageUtilizationPercentages()
 			strat = BUDDY;
 			stratInText = "BUDDY_FIT";
 			fpt = fopen("BUDDY_FIT_UTILIZATION.csv", "w+");
+			break;
 		case 4:
 			strat = MIXED;
 			stratInText = "MIXED_FIT";
 			fpt = fopen("MIXED_FIT_UTILIZATION.csv", "w+");
+			break;
 		}
 		fprintf(fpt, "Iteration, Average Percent Utilization\n");
 		int externalCount = 0;
@@ -179,10 +181,12 @@ void speedsWithMemorySize()
 			strat = BUDDY;
 			stratInText = "BUDDY_FIT";
 			fpt = fopen("BUDDY_FIT_TIME.csv", "w+");
+			break;
 		case 4:
 			strat = MIXED;
 			stratInText = "MIXED_FIT";
 			fpt = fopen("MIXED_FIT_TIME.csv", "w+");
+			break;
 		}
 		fprintf(fpt, "Bytes Allocated, Malloc Time Taken, Free Time Taken\n");
 		t_init(strat);
@@ -325,27 +329,16 @@ void unitTests()
 void testSimpleBuddy()
 {
 	t_init(BUDDY);
-	void *mem = t_malloc(50);
-	t_free(mem);
-	mem = t_malloc(500);
-	t_free(mem);
-	mem = t_malloc(5000);
-	t_free(mem);
-	mem = t_malloc(50000);
-	t_free(mem);
 
-	int *testList = t_malloc(95);
+	int *testList = t_malloc(95 * sizeof(int));
 	for (int i = 0; i < 95; i++)
 	{
 		testList[i] = i;
 	}
-	mem = t_malloc(500000);
-	void *mem2 = t_malloc(694);
 	void *mem3 = t_malloc(94);
 	void *mem4 = t_malloc(21);
 	t_free(mem3);
 	mem3 = t_malloc(94);
-	t_free(mem);
 
 	for (int i = 0; i < 95; i++)
 	{
@@ -368,7 +361,7 @@ void testSimpleBuddy2()
 	t_free(mem3);
 
 	mem3 = t_malloc(94);
-	
+
 	t_free(mem);
 	t_free(mem4);
 	mem4 = t_malloc(50000000);
