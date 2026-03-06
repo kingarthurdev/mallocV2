@@ -17,11 +17,11 @@ void testSimpleBuddy2();
 
 int main(int argc, char *argv[])
 {
-	//basicTestingBenchmarks();
-	//unitTests();
+	basicTestingBenchmarks();
+	unitTests();
 	getAverageUtilizationPercentages();
-	//speedsWithMemorySize();
-	//overheadWithProgramRun();
+	speedsWithMemorySize();
+	overheadWithProgramRun();
 	return 0;
 }
 
