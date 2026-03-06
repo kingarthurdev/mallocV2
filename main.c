@@ -17,11 +17,11 @@ void testSimpleBuddy2();
 
 int main(int argc, char *argv[])
 {
-	basicTestingBenchmarks();
+	//basicTestingBenchmarks();
 	unitTests();
-	getAverageUtilizationPercentages();
-	speedsWithMemorySize();
-	overheadWithProgramRun();
+	//getAverageUtilizationPercentages();
+	//speedsWithMemorySize();
+	//overheadWithProgramRun();
 	return 0;
 }
 
@@ -317,8 +317,8 @@ void unitTests()
 	}
 	PASS("all three strategies return non-NULL")
 
-	testSimpleBuddy();
 	testSimpleBuddy2();
+	testSimpleBuddy();
 	PASS("Passed simple buddy tests")
 }
 
@@ -359,11 +359,17 @@ void testSimpleBuddy()
 void testSimpleBuddy2()
 {
 	t_init(BUDDY);
+	
 	void *mem = t_malloc(500000);
 	void *mem2 = t_malloc(694);
 	void *mem3 = t_malloc(94);
 	void *mem4 = t_malloc(21);
+
 	t_free(mem3);
+
 	mem3 = t_malloc(94);
+	
 	t_free(mem);
+	t_free(mem4);
+	mem4 = t_malloc(50000000);
 }

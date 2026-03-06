@@ -9,7 +9,7 @@
 #include <stdint.h>
 
 // this basically allows us to have chunks that are up to 4mb large, makes 1 bucket for each size range
-#define numBuckets 22
+#define numBuckets 30
 // hold each pointer to each bucket.
 header *buddyBuckets[numBuckets];
 header *headOfFree;
