@@ -18,11 +18,11 @@ void testSimpleBuddy2();
 
 int main(int argc, char *argv[])
 {
-	//basicTestingBenchmarks();
-	//unitTests();
+	basicTestingBenchmarks();
+	unitTests();
 	//getAverageUtilizationPercentages();
 	//speedsWithMemorySize();
-	overheadWithProgramRun();
+	//overheadWithProgramRun();
 	return 0;
 }
 
@@ -82,7 +82,7 @@ void basicTestingBenchmarks()
 		throwError("ERROR! Too slow!");
 	}
 
-	// printf("Basic allocation and time limit test passed!\n");
+	printf("Basic allocation and time limit test passed!\n");
 }
 
 void getAverageUtilizationPercentages()

@@ -55,6 +55,7 @@ void t_init(alloc_strat_e strat)
 		memset(buddyBuckets, 0, (numBuckets * sizeof(header *)));
 		currentPosInMaxSegs = 0;
 		isMixed = 0;
+		buddyOverheadBytes = 0;
 		mapsOfTotalRegions[currentPosInMaxSegs].address = (uintptr_t)mmapBase;
 		mapsOfTotalRegions[currentPosInMaxSegs].size = currentAmountAllocated;
 		currentPosInMaxSegs++;
