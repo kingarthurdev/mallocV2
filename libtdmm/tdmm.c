@@ -24,8 +24,9 @@ int numRegions = 0;
 int numBlocks = 0;
 int isMixed = 0;
 int currentPosInMaxSegs = 0;
+uint64_t buddyOverheadBytes = 0;
 
-regionMap mapsOfTotalRegions[10000]; // lowk arbitrary decision to only be able to map 1000 different regions... hopefully doesn't bite me in the ass...
+regionMap mapsOfTotalRegions[1000]; // lowk arbitrary decision to only be able to map 1000 different regions... hopefully doesn't bite me in the ass...
 
 // TODO: do some integrity checks with the 0xDEADBEEF value to actually use it.
 void t_init(alloc_strat_e strat)
@@ -539,7 +540,10 @@ double memoryUtilizationPercentage()
 
 size_t getOverheadBytes()
 {
-	return numBlocks * (sizeof(header) + sizeof(footer));
+	if (currentMode != BUDDY)
+		return numBlocks * (sizeof(header) + sizeof(footer));
+
+	return buddyOverheadBytes;
 }
 
 void rotateStrats()
@@ -562,6 +566,7 @@ void rotateStrats()
 }
 header *buddyAllocateMoreMemory(size_t amountOfMemNeeded)
 {
+	buddyOverheadBytes += sizeof(header);
 	// amount needed + header overhead aligned to the nearest poweer of 2
 	size_t alignedBaseMem = pow(2, (int)ceil(log2(amountOfMemNeeded + sizeof(header))));
 
@@ -591,6 +596,7 @@ void splitBlocks(header *currentBlock, int alignedSize)
 		currentBlock->size = (currentBlock->size) / 2;
 		int bucket = (int)log2(currentBlock->size);
 		header *newSplitChunk = (header *)((char *)currentBlock + currentBlock->size);
+		buddyOverheadBytes += sizeof(header);
 		newSplitChunk->isFree = 1;
 		newSplitChunk->size = currentBlock->size;
 		newSplitChunk->nextBlock = buddyBuckets[bucket];
@@ -750,6 +756,8 @@ void mergeHanging(header *hangingBlock)
 				hangingBlock->size = (hangingBlock->size) * 2;
 				endBlock = hangingBlock;
 			}
+			buddyOverheadBytes -= sizeof(header);
+
 			mergeHanging(endBlock);
 		}
 		else

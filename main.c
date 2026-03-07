@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 199309L
 #include "./libtdmm/tdmm.h"
 #include <sys/mman.h>
 #include <stdio.h>
@@ -17,10 +18,10 @@ void testSimpleBuddy2();
 
 int main(int argc, char *argv[])
 {
-	basicTestingBenchmarks();
-	unitTests();
-	getAverageUtilizationPercentages();
-	speedsWithMemorySize();
+	//basicTestingBenchmarks();
+	//unitTests();
+	//getAverageUtilizationPercentages();
+	//speedsWithMemorySize();
 	overheadWithProgramRun();
 	return 0;
 }
@@ -39,8 +40,8 @@ void basicTestingBenchmarks()
 	void *temp = mem;
 	void *temp2 = mem3;
 
-	printf("%p     %p     %p\n", mem, mem2, mem3);
-	printf("%li\n", getSysReqMem());
+	// printf("%p     %p     %p\n", mem, mem2, mem3);
+	// printf("%li\n", getSysReqMem());
 	t_free(mem);
 	t_free(mem2);
 	t_free(mem3);
@@ -65,7 +66,7 @@ void basicTestingBenchmarks()
 	}
 	end = clock();
 	cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-	printf("Time taken for allocating 25000 times: %f seconds\n", cpu_time_used);
+	// printf("Time taken for allocating 25000 times: %f seconds\n", cpu_time_used);
 
 	start = clock();
 	for (int i = 0; i < 2500; i++)
@@ -74,14 +75,14 @@ void basicTestingBenchmarks()
 	}
 	end = clock();
 	cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-	printf("Time taken for freeing 25000 times: %f seconds\n", cpu_time_used);
+	// printf("Time taken for freeing 25000 times: %f seconds\n", cpu_time_used);
 
 	if (cpu_time_used > 2)
 	{
 		throwError("ERROR! Too slow!");
 	}
 
-	printf("Basic allocation and time limit test passed!\n");
+	// printf("Basic allocation and time limit test passed!\n");
 }
 
 void getAverageUtilizationPercentages()
@@ -90,6 +91,8 @@ void getAverageUtilizationPercentages()
 	alloc_strat_e strat;
 	char *stratInText = NULL;
 	FILE *fpt;
+	FILE *summary = fopen("UTILIZATION_SUMMARY.csv", "w+");
+	fprintf(summary, "Strategy, Average Percent Utilization\n");
 	for (int i = 0; i < 5; i++)
 	{
 		switch (i)
@@ -124,7 +127,7 @@ void getAverageUtilizationPercentages()
 		int externalCount = 0;
 
 		t_init(strat);
-		srand(time(NULL));
+		srand(42);
 		void *addresses[25000];
 		int count = 0;
 		for (int i = 0; i < 25000; i++)
@@ -145,14 +148,17 @@ void getAverageUtilizationPercentages()
 		}
 		fclose(fpt);
 		fpt = NULL;
-		printf("Strategy: %s   |   Average Percent Utilization: %.2f%%\n", stratInText, memoryUtilizationPercentage());
+		double finalUtil = memoryUtilizationPercentage();
+		fprintf(summary, "%s, %.3f\n", stratInText, finalUtil);
+		// printf("Strategy: %s   |   Average Percent Utilization: %.2f%%\n", stratInText, finalUtil);
 	}
+	fclose(summary);
 }
 
 void speedsWithMemorySize()
 {
-	clock_t start, end, tstart, tend;
-	double cpu_time_used;
+	struct timespec start, end;
+	long ns_used;
 	alloc_strat_e strat;
 	char *stratInText = NULL;
 	FILE *fpt;
@@ -188,23 +194,23 @@ void speedsWithMemorySize()
 			fpt = fopen("MIXED_FIT_TIME.csv", "w+");
 			break;
 		}
-		fprintf(fpt, "Bytes Allocated, Malloc Time Taken, Free Time Taken\n");
+		fprintf(fpt, "Bytes Allocated, Malloc Time Taken, Free Time Taken\n"); // time values in nanoseconds
 		t_init(strat);
 
 		for (int i = 0; i < 8388608; i++)
 		{
 			void *temp;
-			start = clock();
+			clock_gettime(CLOCK_MONOTONIC, &start);
 			temp = t_malloc(i);
-			end = clock();
-			cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-			fprintf(fpt, "%i, %f,", i, cpu_time_used);
+			clock_gettime(CLOCK_MONOTONIC, &end);
+			ns_used = (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
+			fprintf(fpt, "%i, %li,", i, ns_used);
 
-			start = clock();
+			clock_gettime(CLOCK_MONOTONIC, &start);
 			t_free(temp);
-			end = clock();
-			cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-			fprintf(fpt, "%f\n", cpu_time_used);
+			clock_gettime(CLOCK_MONOTONIC, &end);
+			ns_used = (end.tv_sec - start.tv_sec) * 1000000000 + (end.tv_nsec - start.tv_nsec);
+			fprintf(fpt, "%li\n", ns_used);
 		}
 		fclose(fpt);
 		fpt = NULL;
@@ -217,7 +223,7 @@ void overheadWithProgramRun()
 	alloc_strat_e strat;
 	char *stratInText = NULL;
 	FILE *fpt;
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < 5; i++)
 	{
 		switch (i)
 		{
@@ -235,6 +241,16 @@ void overheadWithProgramRun()
 			strat = WORST_FIT;
 			stratInText = "WORST_FIT";
 			fpt = fopen("WORST_FIT_OVERHEAD.csv", "w+");
+			break;
+		case 3:
+			strat = BUDDY;
+			stratInText = "BUDDY_FIT";
+			fpt = fopen("BUDDY_FIT_OVERHEAD.csv", "w+");
+			break;
+		case 4:
+			strat = MIXED;
+			stratInText = "MIXED_FIT";
+			fpt = fopen("MIXED_FIT_OVERHEAD.csv", "w+");
 			break;
 		}
 		fprintf(fpt, "Iteration, Overhead Bytes\n");
@@ -312,8 +328,8 @@ void unitTests()
 		throwError("utilization did not increase after malloc");
 	PASS("utilization increases after malloc")
 
-	alloc_strat_e strats[] = {FIRST_FIT, BEST_FIT, WORST_FIT};
-	for (int i = 0; i < 3; i++)
+	alloc_strat_e strats[] = {FIRST_FIT, BEST_FIT, WORST_FIT, MIXED, BUDDY};
+	for (int i = 0; i < 5; i++)
 	{
 		t_init(strats[i]);
 		if (t_malloc(256) == NULL)
@@ -352,7 +368,7 @@ void testSimpleBuddy()
 void testSimpleBuddy2()
 {
 	t_init(BUDDY);
-	
+
 	void *mem = t_malloc(500000);
 	void *mem2 = t_malloc(694);
 	void *mem3 = t_malloc(94);
