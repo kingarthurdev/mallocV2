@@ -26,7 +26,7 @@ int isMixed = 0;
 int currentPosInMaxSegs = 0;
 uint64_t buddyOverheadBytes = 0;
 
-regionMap mapsOfTotalRegions[1000]; // lowk arbitrary decision to only be able to map 1000 different regions... hopefully doesn't bite me in the ass...
+regionMap mapsOfTotalRegions[5000]; // lowk arbitrary decision to only be able to map 1000 different regions... hopefully doesn't bite me in the ass...
 
 // TODO: do some integrity checks with the 0xDEADBEEF value to actually use it.
 void t_init(alloc_strat_e strat)
